@@ -2,8 +2,9 @@ const redisClient = require("../utils/redisClient");
 const { callGroqApi } = require("./callGroqApi");
 
 async function getRelativeInfo(question) {
-    console.log(question);
-    const relativeInfoPrompt = `
+  console.log(question);
+
+  const relativeInfoPrompt = `
         ## Instruction
         - Categorize the question into one of the predefined categories.
         - Categories: general, skills, interests, relationships, emotion, knowledge, memory, tasks, goals, preferences, opinions, habits.
@@ -13,35 +14,31 @@ async function getRelativeInfo(question) {
         ## User Question
         ${question}
     `;
-    const startTime = Date.now();
-    const category = await callGroqApi(relativeInfoPrompt);
-    console.log(category);
-    const cit = Date.now() - startTime;
+  const startTime = Date.now();
+  const category = await callGroqApi(relativeInfoPrompt);
+  console.log(category);
 
-    const redisKeyPattern = `${category}:*`;
-    console.log(`Fetching Redis keys matching pattern: ${redisKeyPattern}`);
+  const cit = Date.now() - startTime;
 
+  const redisKeyPattern = `${category}:*`;
+  console.log(`Fetching Redis keys matching pattern: ${redisKeyPattern}`);
 
-    const startDrt = Date.now();
+  const startDrt = Date.now();
+  let response = "";
 
-    let response = "";
+  const keys = await redisClient.keys(redisKeyPattern); // Get all keys matching the pattern
+  if (keys.length === 0) {
+    console.log("No keys found.");
+  } 
+  else {
+    console.log("Found keys:", keys);
+    const values = await redisClient.mget(keys); // Fetch all values for the keys
+    keys.map((key, index) => (response += `${key} - ${values[index]}\n`));
+  }
 
-    var stream = await redisClient.scanStream({
-      match: redisKeyPattern,
-      count: 100,
-    });
-    stream.on("data", async function (resultKeys) {
-      // `resultKeys` is an array of strings representing key names.
-      for (var i = 0; i < resultKeys.length; i++) {
-        let value = await redisClient.get(resultKeys[i]);
-        console.log(resultKeys[i] + ":" + value);
-        response += `${resultKeys[i]} - ${value}\n`;
-      }
-    });
+  const drt = Date.now() - startDrt;
 
-    const drt = Date.now() - startDrt;
-
-    return { relativeInfo: response, cit, drt };
+  return { relativeInfo: response, cit, drt };
 }
 
-module.exports = { getRelativeInfo };   
+module.exports = { getRelativeInfo };
